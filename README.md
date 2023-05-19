@@ -2,4 +2,4 @@
 
 This repository provides the official pytorch implementation of FDA in the following papers:
 
-#####Semi-Supervised Deep Transfer Learning for the Microstructure Recognition in the High-Throughput Characterization of Nickel-based Superalloys
+##### Semi-Supervised Deep Transfer Learning for the Microstructure Recognition in the High-Throughput Characterization of Nickel-based Superalloys
