@@ -31,106 +31,18 @@ TRAIN_BATCH = 2
 TEST_BATCH = 2
 
 LEARNING_RATE = 1e-3
+WEIGHT_DECAY = 0.0005
 MOMENTUM = 0.9
 LEARNING_RATE_D1 = 1e-4
-LEARNING_RATE_D2 = 1e-5
+LEARNING_RATE_D2 = 1e-4
+LAMBDA_D1 = 1
 LAMBDA_D2 = 0.01
-NUM_ITERS = 10000
+NUM_ITERS = 5000
 POWER = 0.9
 EVAL_STEP = 200
 USE_PROB = True
 USE_FEAT = True
 USE_LEVEL = 3
-
-
-def train_source(args):
-    use_gpu = torch.cuda.is_available()
-
-    print("Initializing dataset {}".format(args.dataset))
-    if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
-
-    # data augmentation
-    transform_train = T.Compose([
-        T.RandomHorizontalFlip(),
-        T.ToTensor(),
-    ])
-
-    transform_val = T.Compose([T.ToTensor()])
-
-    train_loader = DataLoader(
-        SASeg(args.source_data_root, transform=transform_train, split='test'),
-        batch_size=args.train_batch, num_workers=args.workers, drop_last=False,
-    )
-
-    val_loader = DataLoader(
-        SASeg(args.source_data_root, transform=transform_val, split='val'),
-        batch_size=args.test_batch, num_workers=args.workers, drop_last=False,
-    )
-
-    print("Initializing model: {}".format(args.arch))
-    model = NestNet(in_channels=2, n_classes=1)
-
-    # criterion
-    criterion = nn.BCELoss()
-
-    optimizer = init_optim(args.optim, model.parameters(), args.lr, args.weight_decay)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.stepsize, gamma=args.gamma)
-
-    if args.resume:
-        print("Loading checkpoint from '{}'".format(args.resume))
-        checkpoint = torch.load(args.resume)
-        model.load_state_dict(checkpoint['state_dict'])
-        start_epoch = checkpoint['epoch']
-
-    if args.pre_trained:
-        print("Loading checkpoint from '{}'".format(args.pre_trained))
-        checkpoint = torch.load(args.pre_trained)
-        model.load_state_dict(checkpoint['state_dict'])
-
-    if use_gpu:
-        model = nn.DataParallel(model).cuda()
-
-    start_time = time.time()
-    train_time = 0
-    best_acc = -np.inf
-    best_epoch = 0
-
-    print("==> Start training")
-    model.train()
-    for epoch in range(200):
-        start_train_time = time.time()
-
-        train(args, epoch, model, criterion, optimizer, train_loader, use_gpu)
-
-        train_time += round(time.time() - start_train_time)
-        scheduler.step()
-
-        print("==> Validate")
-        acc = validate(args, model, val_loader, use_gpu)
-
-        is_best = acc > best_acc
-        if is_best:
-            best_acc = acc
-            best_epoch = epoch + 1
-
-            if use_gpu:
-                state_dict = model.module.state_dict()
-            else:
-                state_dict = model.state_dict()
-            save_checkpoint({
-                'state_dict': state_dict,
-                'acc': acc,
-                'epoch': epoch,
-            }, False, os.path.join(args.save_dir, 'best_model_.pth.tar'))
-
-        print("==> Acc {:.1%} at epoch {}, with lr {}".format(acc, epoch+1, optimizer.param_groups[0]['lr']))
-        print("==> Best Acc {:.1%}, achieved at epoch {}".format(best_acc, best_epoch))
-
-        elapsed = round(time.time() - start_time)
-        elapsed = str(datetime.timedelta(seconds=elapsed))
-        _train_time = str(datetime.timedelta(seconds=train_time))
-        print("Finished. Total elapsed time (h:m:s): {}. Training time (h:m:s): {}.".format(elapsed, _train_time))
 
 
 def main(args):
@@ -156,13 +68,6 @@ def main(args):
     )
     source_loader_iter = enumerate(source_train_loader)
 
-    # source_train_loader = DataLoader(
-    #     SASeg(args.source_data_root, transform=transform_train,
-    #           max_iters=args.num_iters * args.train_batch, split='test'),
-    #     batch_size=args.train_batch, num_workers=args.workers, drop_last=False,
-    # )
-    # source_loader_iter = enumerate(source_train_loader)
-
     target_train_loader = DataLoader(
         SASeg(args.target_data_root, transform=transform_train,
               max_iters=args.num_iters * args.train_batch, split='train' + args.num_target),
@@ -175,6 +80,7 @@ def main(args):
               max_iters=args.num_iters * args.train_batch, split='test'),
         batch_size=args.train_batch, num_workers=args.workers, drop_last=False,
     )
+
     unlabeled_loader_iter = enumerate(target_test_loader)
 
     val_loader = DataLoader(
@@ -199,10 +105,8 @@ def main(args):
         model_D2 = model_D2.cuda()
 
     # optimizer
-    # optimizer = init_optim(args.optim, model.parameters(), args.learning_rate, args.weight_decay)
-    # scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.stepsizet, gamma=args.gammat)
-    optimizer = optim.SGD(model.parameters(),
-                          lr=args.learning_rate, momentum=args.momentum, weight_decay=args.weight_decay)
+    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.stepsize, gamma=args.gamma)
     optimizer.zero_grad()
 
     optimizer_D1 = optim.Adam(model_D1.parameters(), lr=args.learning_rate_D1, betas=(0.9, 0.99))
@@ -213,7 +117,6 @@ def main(args):
     # criterion
     criterion = nn.BCELoss()
     bce_loss = torch.nn.BCEWithLogitsLoss()
-    # criterion_trans = MMD_loss(start_layer=3, sample_num=500)
 
     start_time = time.time()
     train_time = 0
@@ -239,17 +142,6 @@ def main(args):
         adjust_learning_rate(args, optimizer_D1, iter, args.learning_rate_D1)
         optimizer_D2.zero_grad()
         adjust_learning_rate(args, optimizer_D2, iter, args.learning_rate_D2)
-
-        # train segmentation model
-        # _, batch = source_loader_iter.__next__()
-        # img_s, label_s, _ = batch
-        # if use_gpu:
-        #     img_s, label_s = img_s.cuda(), label_s.cuda()
-        # feat_s, output_s = model(img_s)
-        #
-        # loss_seg_s = criterion(output_s, label_s)
-        # loss_seg_s.backward()
-        # loss_seg_s_value += loss_seg_s.item()
 
         _, batch = source_loader_iter.__next__()
         feat_s, output_s, label_s = batch
@@ -277,14 +169,12 @@ def main(args):
             loss_adv_su = args.lambda_D2 * loss_adv_su
             loss_adv_su.backward()
 
+            # train discriminator
             for param in model_D2.parameters():
                 param.requires_grad = True
 
             output_s = output_s.detach()
             D_out_s = model_D2(output_s)
-            # loss_D = bce_loss(D_out_s, torch.FloatTensor(D_out_s.data.size()).fill_(0).cuda())/2
-            # loss_D.backward()
-            # loss_D2_value += loss_D.item()
 
             output_tu = output_tu.detach()
             D_out_tu = model_D2(output_tu)
@@ -312,6 +202,7 @@ def main(args):
             D_out_tl = model_D1(feat_tl[:, args.levels])
             loss_adv_tl = bce_loss(D_out_tl, label_tl)
             loss_adv1_value = loss_adv_tl.item()
+            loss_adv_tl = args.lambda_D1 * loss_adv_tl
             loss_adv_tl.backward()
 
             for param in model_D1.parameters():
@@ -330,7 +221,6 @@ def main(args):
             loss_D1_value += loss_D.item()
 
         optimizer.step()
-        # scheduler.step()
         optimizer_D1.step()
         optimizer_D2.step()
 
@@ -390,8 +280,6 @@ def parse_args():
                         help="manual epoch number (useful on restarts)")
     parser.add_argument('--lr', type=float, default=1e-3,
                         help="Base learning rate for training with polynomial decay.")
-    parser.add_argument('--gamma', default=0.5, type=float,
-                        help="learning rate decay")
     parser.add_argument('--stepsize', default=50, type=int,
                         help="stepsize to decay learning rate (>0 means this is enabled)")
     # training
@@ -405,12 +293,14 @@ def parse_args():
                         help="optimizer type")
     parser.add_argument('--learning-rate', type=float, default=LEARNING_RATE,
                         help="Base learning rate for training with polynomial decay.")
-    parser.add_argument('--gammat', default=0.5, type=float,
-                        help="learning rate decay")
+    parser.add_argument("--weight-decay", type=float, default=WEIGHT_DECAY,
+                        help="Regularisation parameter for L2-loss.")
     parser.add_argument('--stepsizet', default=500, type=int,
                         help="stepsize to decay learning rate (>0 means this is enabled)")
     parser.add_argument('--learning-rate-D1', type=float, default=LEARNING_RATE_D1,
                         help="Base learning rate for discriminator 1.")
+    parser.add_argument('--lambda-D1', type=float, default=LAMBDA_D1,
+                        help="Lambda for discriminator 1.")
     parser.add_argument('--learning-rate-D2', type=float, default=LEARNING_RATE_D2,
                         help="Base learning rate for discriminator 2.")
     parser.add_argument('--lambda-D2', type=float, default=LAMBDA_D2,
