@@ -2,6 +2,7 @@
 
 This repository provides the official pytorch implementation of feature distribution alignment (FDA) for the microstructure recognition of nickel-based superalloys with different compositions and heat treatment procedures.
 ![image](image/framework.png)
+
 ## Paper
 ##### Semi-Supervised Deep Transfer Learning for the Microstructure Recognition in the High-Throughput Characterization of Nickel-based Superalloys
 
