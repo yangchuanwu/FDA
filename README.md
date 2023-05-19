@@ -11,7 +11,10 @@ You can contact the author by email  to get the data.
 
 ### Data partitioning
 cd preprocess
+
 python train_val.py
+
+
 
 ### Train a source model
 python tools/train_source.py
