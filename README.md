@@ -9,10 +9,18 @@ This repository provides the official pytorch implementation of feature distribu
 ### Dataset
 You can contact the author by email  to get the data.
 
+### Data partitioning
+cd preprocess
+python train_val.py
+
+### Train a source model
+python tools/train_source.py
 
 ## Trianing
-python tools/
+python tools/train.py
 
 ## Testing
+python tools/test.py
 
 ## Visuliztion
+python tools/vis.py
