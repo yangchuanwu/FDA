@@ -19,11 +19,12 @@ python train_val.py
 ### Train a source model
 python tools/train_source.py
 
-## Trianing
+## Train the recognition model in target domain (new compositions and heat treatment procedures)
+### Trianing
 python tools/train.py
 
-## Testing
+### Testing
 python tools/test.py
 
-## Visuliztion
+### Visuliztion
 python tools/vis.py
