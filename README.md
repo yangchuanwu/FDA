@@ -7,7 +7,7 @@ This repository provides the official pytorch implementation of feature distribu
 
 ## Preparation
 ### Dataset
-You can contact the author by email [Weifu Li] (liweifu@mail.hzau.edu.cn) to get the data.
+You can contact the author [Weifu Li] (liweifu@mail.hzau.edu.cn) to get the data.
 
 ### Data partitioning
 cd preprocess
