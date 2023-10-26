@@ -4,7 +4,7 @@ This repository provides the official pytorch implementation of feature distribu
 ![image](image/framework.png)
 
 ## Paper
-##### Semi-Supervised Deep Transfer Learning for the Microstructure Recognition in the High-Throughput Characterization of Nickel-based Superalloys\url{https://doi.org/10.1016/j.matchar.2023.113094}
+##### [Semi-Supervised Deep Transfer Learning for the Microstructure Recognition in the High-Throughput Characterization of Nickel-based Superalloys](https://doi.org/10.1016/j.matchar.2023.113094)
 
 ## Preparation
 ### Dataset
